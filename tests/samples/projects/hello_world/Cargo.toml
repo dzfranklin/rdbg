@@ -1,5 +1,5 @@
 [package]
-name = "hello_world_bin"
+name = "hello_world"
 version = "0.1.0"
 authors = ["Daniel Franklin <daniel@danielzfranklin.org>"]
 edition = "2018"
