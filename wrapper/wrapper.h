@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include "vendor/rr/src/ReplaySession.h"
+#include <ReplaySession.h>
 
 namespace wrapper
 {
@@ -14,3 +14,13 @@ namespace wrapper
     std::shared_ptr<rr::ReplaySession> ReplaySession_create(
         const std::string &dir, const ReplaySession_Flags &flags);
 } // namespace wrapper
+
+namespace rr
+{
+    void assert_prerequisites(bool use_syscall_buffer = false);
+
+    void print_global_options(FILE *);
+    void print_usage(FILE *);
+
+    bool parse_global_option(std::vector<std::string> &args);
+}

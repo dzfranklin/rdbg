@@ -1,5 +1,6 @@
 #include <memory>
-#include "vendor/rr/src/ReplaySession.h"
+#include <iostream>
+#include <ReplaySession.h>
 
 namespace wrapper
 {
@@ -11,7 +12,9 @@ namespace wrapper
 
     std::unique_ptr<rr::ReplaySession::Flags> ReplaySession_Flags_default()
     {
-        return std::make_unique<rr::ReplaySession::Flags>();
+        auto flags = std::make_unique<rr::ReplaySession::Flags>();
+        flags->redirect_stdio = true;
+        return flags;
     }
 
     void ReplaySession_Flags_redirect_stdio(rr::ReplaySession::Flags &flags, bool value)
@@ -19,3 +22,16 @@ namespace wrapper
         flags.redirect_stdio = value;
     }
 } // namespace wrapper
+
+namespace rr
+{
+    void assert_prerequisites(bool use_syscall_buffer = false) {}
+
+    void print_global_options(FILE *) {}
+    void print_usage(FILE *) {}
+
+    bool parse_global_option(std::vector<std::string> &args)
+    {
+        return true;
+    }
+}
