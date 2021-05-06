@@ -1,2 +1,0 @@
-#[cxx::bridge]
-mod ffi {}

@@ -1,0 +1,6 @@
+[submodule "wrapper/vendor"]
+path = wrapper/vendor
+url = git@github.com:rr-debugger/rr.git
+[submodule "wrapper/vendor/rr"]
+	path = wrapper/vendor/rr
+	url = git@github.com:rr-debugger/rr.git
