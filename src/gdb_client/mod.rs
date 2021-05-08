@@ -62,7 +62,7 @@ impl<R: BufRead, W: io::Write> GdbClient<R, W> {
     }
 
     fn read_packet_no_retries(&mut self) -> eyre::Result<Vec<u8>> {
-        self.read_ack()?;
+        self.expect_ack()?;
         let mut cap = PACKET_SIZE_GUESS;
         let mut len = 0;
         let mut buf = Vec::new();
@@ -74,6 +74,7 @@ impl<R: BufRead, W: io::Write> GdbClient<R, W> {
                 Ok((unused, body)) => {
                     assert!(unused.is_empty());
                     debug!(len, cap, "Got packet");
+                    self.send_ack()?;
                     break Ok(body);
                 }
                 Err(nom::Err::Incomplete(nom::Needed::Unknown)) => {
@@ -82,17 +83,26 @@ impl<R: BufRead, W: io::Write> GdbClient<R, W> {
                         cap *= 2;
                         debug!("Resized buf to {cap}");
                     }
+                    self.send_nack()?;
                 }
                 Err(nom::Err::Incomplete(nom::Needed::Size(needed))) => {
                     debug!(len, cap, needed, "Incomplete packet, known needed");
                     cap += needed.get();
+                    self.send_nack()?;
                 }
                 Err(err) => return Err(err.into()),
             }
         }
     }
 
-    fn read_ack(&mut self) -> eyre::Result<()> {
+    fn send_packet(&mut self, body: &[u8]) -> eyre::Result<()> {
+        let packet = serializer::packet(body);
+        self.tx.write_all(&packet)?;
+        self.tx.flush()?;
+        Ok(())
+    }
+
+    fn expect_ack(&mut self) -> eyre::Result<()> {
         let mut buf = vec![0];
         self.recv.read_exact(&mut buf)?;
         match *buf.get(0).unwrap() {
@@ -102,10 +112,13 @@ impl<R: BufRead, W: io::Write> GdbClient<R, W> {
         }
     }
 
-    fn send_packet(&mut self, body: &[u8]) -> eyre::Result<()> {
-        let packet = serializer::packet(body);
-        self.tx.write_all(&packet)?;
-        self.tx.flush()?;
+    fn send_ack(&mut self) -> eyre::Result<()> {
+        self.tx.write_all(&[common::ACK])?;
+        Ok(())
+    }
+
+    fn send_nack(&mut self) -> eyre::Result<()> {
+        self.tx.write_all(&[common::NACK])?;
         Ok(())
     }
 }
