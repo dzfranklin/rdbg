@@ -3,18 +3,51 @@ use std::{collections::HashMap, convert::TryInto, fmt};
 use super::common::{self, compute_checksum};
 use nom::{
     branch::alt,
-    bytes::streaming::{tag, take, take_until},
+    bytes::{
+        complete::{tag, take, take_until},
+        streaming,
+    },
+    combinator::map,
     error::{context, ContextError, ParseError},
-    multi::{many0, many1},
+    multi::{many0, many1, separated_list1},
     sequence::{pair, preceded, tuple},
 };
 
 type IResult<I, O> = nom::IResult<I, O, Error>;
 
-pub fn halt_reason(i: &[u8]) -> IResult<&[u8], HaltReason> {
+pub fn general_registers(i: &[u8]) -> IResult<&[u8], Vec<u8>> {
+    many1(two_digit_hex)(i)
+}
+
+pub fn thread_info(i: &[u8]) -> IResult<&[u8], Vec<ThreadId>> {
+    let thread_info_none = map(tag("l"), |_| Vec::new());
+    let thread_info_list = preceded(tag("m"), separated_list1(tag(","), thread_id));
+    alt((thread_info_none, thread_info_list))(i)
+}
+
+pub fn stop_reason(i: &[u8]) -> IResult<&[u8], StopReason> {
+    alt((
+        context("stop_reason_signal", stop_reason_signal),
+        context("stop_reason_process_exit", stop_reason_process_exit),
+    ))(i)
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum StopReason {
+    Signal {
+        signal: u8,
+        thread: ThreadId,
+        reason: Option<String>,
+    },
+    ProcessExit {
+        status: u8,
+    },
+}
+
+fn stop_reason_signal(i: &[u8]) -> IResult<&[u8], StopReason> {
     // See GdbConnection::send_stop_reply_packet
     let (i, _) = tag(b"T")(i)?;
-    let (i, signal_num) = two_digit_hex(i)?;
+    let (i, signal) = two_digit_hex(i)?;
     let (i, _) = tag(b"thread:")(i)?;
     let (i, thread) = thread_id(i)?;
 
@@ -22,25 +55,25 @@ pub fn halt_reason(i: &[u8]) -> IResult<&[u8], HaltReason> {
     let reason = if reason.is_empty() {
         None
     } else {
-        let reason =
-            std::str::from_utf8(reason).map_err(|err| Error::new(reason, ErrorKind::Utf8(err)))?;
+        let reason = std::str::from_utf8(reason)
+            .map_err(|err| Error::new(reason, ParseErrorKind::Utf8(err).into()))?;
         Some(reason.to_owned())
     };
 
-    let reply = HaltReason {
-        signal_num,
+    let reason = StopReason::Signal {
+        signal,
         thread,
         reason,
     };
 
-    Ok((&[], reply))
+    Ok((&[], reason))
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HaltReason {
-    signal_num: u8,
-    thread: ThreadId,
-    reason: Option<String>,
+fn stop_reason_process_exit(i: &[u8]) -> IResult<&[u8], StopReason> {
+    let (i, _) = tag(b"W")(i)?;
+    let (i, status) = two_digit_hex(i)?;
+    let reason = StopReason::ProcessExit { status };
+    Ok((i, reason))
 }
 
 fn thread_id(i: &[u8]) -> IResult<&[u8], ThreadId> {
@@ -66,6 +99,8 @@ fn singleprocess_thread_id(i: &[u8]) -> IResult<&[u8], ThreadId> {
 pub enum ThreadId {
     MultiProcess { pid: u64, tid: u64 },
     SingleProcess { tid: u64 },
+    All,
+    Any,
 }
 
 fn parse_dict(i: &[u8]) -> IResult<&[u8], HashMap<Vec<u8>, Vec<u8>>> {
@@ -78,9 +113,9 @@ fn parse_dict(i: &[u8]) -> IResult<&[u8], HashMap<Vec<u8>, Vec<u8>>> {
 }
 
 pub fn packet_body(i: &[u8]) -> IResult<&[u8], Vec<u8>> {
-    let (i, _) = tag(&[common::PACKET_START][..])(i)?;
+    let (i, _) = streaming::tag(&[common::PACKET_START][..])(i)?;
 
-    let (i, body) = take_until(&[common::CHECKSUM_START][..])(i)?;
+    let (i, body) = streaming::take_until(&[common::CHECKSUM_START][..])(i)?;
     let i = &i[1..]; // take off #
 
     let (i, expected) = checksum(i)?;
@@ -88,7 +123,7 @@ pub fn packet_body(i: &[u8]) -> IResult<&[u8], Vec<u8>> {
     if expected != actual {
         return Err(Error::new(
             body,
-            ErrorKind::FailedChecksum { expected, actual },
+            ParseErrorKind::FailedChecksum { expected, actual }.into(),
         ));
     }
 
@@ -96,10 +131,15 @@ pub fn packet_body(i: &[u8]) -> IResult<&[u8], Vec<u8>> {
         let body = &body[1..];
         let (rest, code) = two_digit_hex(body)?;
         assert!(rest.is_empty());
-        return Err(Error::new(body, ErrorKind::App(code)));
+        return Err(Error::new(body, AppErrorKind::Error(code).into()));
     }
 
-    let body = expand_body(body).map_err(|err| Error::new(body, ErrorKind::ExpandBody(err)))?;
+    if body.is_empty() {
+        return Err(Error::new(body, AppErrorKind::NotSupported.into()));
+    }
+
+    let body = expand_body(body)
+        .map_err(|err| Error::new(body, ParseErrorKind::ExpandBody(err).into()))?;
     Ok((i, body))
 }
 
@@ -172,21 +212,34 @@ fn hex_digit(i: &[u8]) -> IResult<&[u8], u8> {
     let digit = digit[0] as char;
 
     digit.to_digit(HEX_RADIX).map_or_else(
-        || Err(Error::new(i, ErrorKind::ExpectedHexDigit(digit))),
+        || {
+            Err(Error::new(
+                i,
+                ParseErrorKind::ExpectedHexDigit(digit).into(),
+            ))
+        },
         |digit| Ok((i, digit.try_into().unwrap())),
     )
 }
 
 #[derive(Debug, thiserror::Error)]
 pub struct Error {
-    input: Vec<u8>,
-    kind: ErrorKind,
-    context: Option<&'static str>,
-    causes: Vec<ErrorKind>,
+    pub input: Vec<u8>,
+    pub kind: ErrorKind,
+    pub context: Option<&'static str>,
+    pub causes: Vec<ErrorKind>,
 }
 
 #[derive(Debug, displaydoc::Display)]
 pub enum ErrorKind {
+    /// Parse error
+    Parse(ParseErrorKind),
+    /// Application level error
+    App(AppErrorKind),
+}
+
+#[derive(Debug, displaydoc::Display)]
+pub enum ParseErrorKind {
     /// Expected hex digit, got {0}
     ExpectedHexDigit(char),
     /// Failed checksum check. Expected {expected}, got {actual}
@@ -195,10 +248,16 @@ pub enum ErrorKind {
     ExpandBody(ExpandError),
     /// Failed to parse as utf-8: {0}
     Utf8(std::str::Utf8Error),
-    /// Application level error. Code: {0}
-    App(u8),
     /// Nom error: {0:?}
     Nom(nom::error::ErrorKind),
+}
+
+#[derive(Debug, displaydoc::Display)]
+pub enum AppErrorKind {
+    /// Code: {0}
+    Error(u8),
+    /// Not supported
+    NotSupported,
 }
 
 impl Error {
@@ -233,11 +292,11 @@ impl fmt::Display for Error {
 
 impl ParseError<&[u8]> for Error {
     fn from_error_kind(input: &[u8], kind: nom::error::ErrorKind) -> Self {
-        Self::new_inner(input, ErrorKind::Nom(kind))
+        Self::new_inner(input, ParseErrorKind::Nom(kind).into())
     }
 
     fn append(_input: &[u8], kind: nom::error::ErrorKind, mut other: Self) -> Self {
-        other.causes.push(ErrorKind::Nom(kind));
+        other.causes.push(ParseErrorKind::Nom(kind).into());
         other
     }
 }
@@ -255,18 +314,38 @@ impl From<Error> for nom::Err<Error> {
     }
 }
 
+impl From<AppErrorKind> for ErrorKind {
+    fn from(err: AppErrorKind) -> Self {
+        Self::App(err)
+    }
+}
+
+impl From<ParseErrorKind> for ErrorKind {
+    fn from(err: ParseErrorKind) -> Self {
+        Self::Parse(err)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn stop_reply_single_threaded() -> eyre::Result<()> {
-        let actual = halt_reason(b"T00thread:29164b;")?;
+    fn test_thread_info() -> eyre::Result<()> {
+        let actual = thread_info(b"m2ce318")?;
+        let expected = (&[][..], vec![ThreadId::SingleProcess { tid: 0x002c_e318 }]);
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[test]
+    fn test_stop_reason_single_threaded_signal() -> eyre::Result<()> {
+        let actual = stop_reason(b"T00thread:29164b;")?;
         let expected = (
             &[][..],
-            HaltReason {
-                signal_num: 0,
+            StopReason::Signal {
+                signal: 0,
                 thread: ThreadId::SingleProcess { tid: 0x0029_164b },
                 reason: None,
             },

@@ -1,5 +1,5 @@
 mod common;
-use common::{init, trace_hello_world, Result};
+use common::{init, trace_hello_world, trace_simple, Result};
 use insta::assert_debug_snapshot;
 
 use server::Replay;

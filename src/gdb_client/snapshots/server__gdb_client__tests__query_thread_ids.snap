@@ -1,0 +1,10 @@
+---
+source: src/gdb_client/mod.rs
+expression: subject.query_thread_ids()?
+
+---
+[
+    SingleProcess {
+        tid: 2941720,
+    },
+]

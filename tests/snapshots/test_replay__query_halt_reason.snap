@@ -3,8 +3,8 @@ source: tests/test_replay.rs
 expression: subject.query_halt_reason()?
 
 ---
-HaltReason {
-    signal_num: 0,
+Signal {
+    signal: 0,
     thread: SingleProcess {
         tid: 2692683,
     },

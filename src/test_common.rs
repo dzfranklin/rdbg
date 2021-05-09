@@ -1,6 +1,6 @@
 use std::sync::Once;
 
-use server::Trace;
+use crate::Trace;
 
 pub type Result = eyre::Result<()>;
 
@@ -34,3 +34,5 @@ pub fn trace_simple() -> Trace {
     //   Another program modifying it is considered out of scope.
     unsafe { Trace::new(dir, bin) }.unwrap()
 }
+
+pub const SIMPLE_MAIN: u64 = 0x5625_247a_1f97;

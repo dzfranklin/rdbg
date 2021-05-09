@@ -8,8 +8,9 @@
 
 mod gdb_client;
 pub mod replay;
+#[cfg(test)]
+pub(crate) mod test_common;
 pub mod trace;
 
-pub use gdb_client::GdbClient;
 pub use replay::Replay;
 pub use trace::Trace;

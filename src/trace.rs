@@ -1,14 +1,25 @@
-use camino::Utf8PathBuf;
+use std::{fs, path::Path};
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Trace(Utf8PathBuf);
+use camino::Utf8PathBuf;
+use memmap::Mmap;
+
+#[derive(Debug)]
+pub struct Trace {
+    pub(crate) dir: Utf8PathBuf,
+    pub(crate) bin: memmap::Mmap,
+}
 
 impl Trace {
-    pub fn new(dir: impl Into<Utf8PathBuf>) -> Self {
-        Self(dir.into())
-    }
+    /// # Safety
+    /// Bin must point to a file, and the file may not be modified once this
+    /// function is called (the file is memory-mapped).
+    pub unsafe fn new(dir: impl Into<Utf8PathBuf>, bin: impl AsRef<Path>) -> eyre::Result<Self> {
+        let file = fs::File::open(bin)?;
+        let bin = Mmap::map(&file)?;
 
-    pub(crate) fn as_str(&self) -> &str {
-        self.0.as_str()
+        Ok(Self {
+            dir: dir.into(),
+            bin,
+        })
     }
 }
