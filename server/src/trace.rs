@@ -1,25 +1,22 @@
-use std::{fs, path::Path};
-
 use camino::Utf8PathBuf;
-use memmap::Mmap;
 
-#[derive(Debug)]
+use crate::Replay;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Trace {
-    pub(crate) dir: Utf8PathBuf,
-    pub(crate) bin: memmap::Mmap,
+    pub(crate) trace_dir: Utf8PathBuf,
+    pub(crate) crate_name: String,
 }
 
 impl Trace {
-    /// # Safety
-    /// Bin must point to a file, and the file may not be modified once this
-    /// function is called (the file is memory-mapped).
-    pub unsafe fn new(dir: impl Into<Utf8PathBuf>, bin: impl AsRef<Path>) -> eyre::Result<Self> {
-        let file = fs::File::open(bin)?;
-        let bin = Mmap::map(&file)?;
+    pub fn new(trace_dir: impl Into<Utf8PathBuf>, crate_name: impl Into<String>) -> Self {
+        Self {
+            trace_dir: trace_dir.into(),
+            crate_name: crate_name.into(),
+        }
+    }
 
-        Ok(Self {
-            dir: dir.into(),
-            bin,
-        })
+    pub async fn replay(self) -> eyre::Result<Replay> {
+        Replay::spawn(self)
     }
 }

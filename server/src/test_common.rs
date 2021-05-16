@@ -1,4 +1,9 @@
-use std::sync::Once;
+use duct::cmd;
+use lazy_static::lazy_static;
+use std::{
+    collections::HashSet,
+    sync::{Mutex, Once},
+};
 
 use crate::Trace;
 
@@ -17,22 +22,60 @@ pub fn init() {
     });
 }
 
-pub fn trace_hello_world() -> Trace {
-    let dir = camino::Utf8PathBuf::from("tests/samples/traces/hello_world");
-    let bin = dir.join("mmap_hardlink_4_hello_world");
-    // Safety: Bin must point to a file which must never be modified
-    //   The file is in our source directory, and we never modify it.
-    //   Another program modifying it is considered out of scope.
-    unsafe { Trace::new(dir, bin) }.unwrap()
+lazy_static! {
+    static ref RECORDED: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+    static ref BUILT: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+}
+
+pub fn build(name: &str) -> String {
+    let mut built = BUILT.lock().unwrap();
+    if !built.contains(name) {
+        cmd!(
+            "cargo",
+            "build",
+            "-Z",
+            "unstable-options",
+            "--out-dir",
+            "../.out"
+        )
+        .dir(format!("samples/{}", name))
+        .stdin_null()
+        .stdout_null()
+        .stderr_null()
+        .run()
+        .expect("Failed to build sample");
+        built.insert(name.to_owned());
+    }
+    format!("samples/.out/{}", name)
+}
+
+pub fn record(name: &str) -> String {
+    let trace_out = format!("samples/.trace/{}", name);
+
+    let mut recorded = RECORDED.lock().unwrap();
+    if !recorded.contains(name) {
+        let bin = build(name);
+
+        cmd!("mkdir", "-p", "samples/.trace").run().unwrap();
+        let _result = cmd!("rm", "-rf", &trace_out).run();
+
+        cmd!("rr", "record", "--output-trace-dir", &trace_out, bin)
+            .stdin_null()
+            .stdout_null()
+            .stderr_null()
+            .run()
+            .expect("Failed to record sample");
+
+        recorded.insert(name.to_owned());
+    }
+
+    trace_out
 }
 
 pub fn trace_simple() -> Trace {
-    let dir = camino::Utf8PathBuf::from("tests/samples/traces/simple");
-    let bin = dir.join("mmap_hardlink_4_blog");
-    // Safety: Bin must point to a file which must never be modified
-    //   The file is in our source directory, and we never modify it.
-    //   Another program modifying it is considered out of scope.
-    unsafe { Trace::new(dir, bin) }.unwrap()
+    Trace::new(record("simple"), "simple")
 }
 
-pub const SIMPLE_MAIN: u64 = 0x5625_247a_1f97;
+pub fn trace_hello_world() -> Trace {
+    Trace::new(record("hello_world"), "hello_world")
+}
