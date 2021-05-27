@@ -1,0 +1,116 @@
+syntax = "proto3";
+package org.danielzfranklin.rdbg.code_view;
+
+service CodeView {
+    // Separated so we can display source while waiting for highlights
+    rpc source(SourceRequest) returns (SourceReply);
+    rpc highlight(HighlightRequest) returns (HighlightReply);
+}
+
+message FileId {
+    uint32 id = 1;
+}
+
+message SourceRequest {
+    FileId file = 1;
+}
+
+message SourceReply {
+    repeated SourceLine lines = 1;
+}
+
+message SourceLine {
+    uint32 start = 1;
+    uint32 end = 2;
+    string text = 3;
+}
+
+message HighlightRequest {
+    FileId file = 1;
+}
+
+message HighlightReply {
+    repeated HlRange ranges = 1;
+}
+
+message HlRange {
+    TextRange range = 1;
+    Highlight highlight = 2;
+}
+
+message TextRange {
+    uint32 start = 1;
+    uint32 end = 2;
+}
+
+message Highlight {
+    HlTag tag = 1;
+    repeated HlMod mods = 2;
+}
+
+enum HlTag {
+    NONE = 0;
+    SYM_CONST = 1;
+    SYM_CONST_PARAM = 2;
+    SYM_ENUM = 3;
+    SYM_FIELD = 4;
+    SYM_FUNCTION = 5;
+    SYM_IMPL = 6;
+    SYM_LABEL = 7;
+    SYM_LIFETIME_PARAM = 8;
+    SYM_LOCAL = 9;
+    SYM_MACRO = 10;
+    SYM_MODULE = 11;
+    SYM_SELF_PARAM = 12;
+    SYM_STATIC = 13;
+    SYM_STRUCT = 14;
+    SYM_TRAIT = 15;
+    SYM_TYPE_ALIAS = 16;
+    SYM_TYPE_PARAM = 17;
+    SYM_UNION = 18;
+    SYM_VALUE_PARAM = 19;
+    SYM_VARIENT = 20;
+    ATTRIBUTE = 21;
+    BOOL_LITERAL = 22;
+    BUILTIN_TYPE = 23;
+    BYTE_LITERAL = 24;
+    CHAR_LITERAL = 25;
+    COMMENT = 26;
+    ESCAPE_SEQUENCE = 27;
+    FORMAT_SPECIFIER = 28;
+    KEYWORD = 29;
+    NUMERIC_LITERAL = 30;
+    OP_OTHER = 31;
+    OP_BITWISE = 32;
+    OP_ARITHMETIC = 33;
+    OP_LOGICAL = 34;
+    OP_COMPARISON = 35;
+    PUNCT_OTHER = 36;
+    PUNCT_BRACKET = 37;
+    PUNCT_BRACE = 38;
+    PUNCT_PARENTHESIS = 39;
+    PUNCT_ANGLE = 40;
+    PUNCT_COMMA = 41;
+    PUNCT_DOT = 42;
+    PUNCT_COLON = 43;
+    PUNCT_SEMI = 44;
+}
+
+enum HlMod {
+    MOD_UNKNOWN = 0;
+    MOD_ASSOCIATED = 1;
+    MOD_ATTRIBUTE = 2;
+    MOD_CALLABLE = 3;
+    MOD_CONSUMING = 4;
+    MOD_CONTROL_FLOW = 5;
+    MOD_DEFINITION = 6;
+    MOD_DOCUMENTATION = 7;
+    MOD_INJECTED = 8;
+    MOD_INTRA_DOC_LINK = 9;
+    MOD_MUTABLE = 10;
+    MOD_STATIC = 11;
+    MOD_TRAIT = 12;
+    MOD_ASYNC = 13;
+    MOD_LIBRARY = 14;
+    MOD_UNSAFE = 15;
+}

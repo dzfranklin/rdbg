@@ -67,7 +67,7 @@ impl Replay {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct IndexFrame {
     frame: Frame,
     vars: Vec<Variable>,

@@ -1,0 +1,42 @@
+syntax = "proto3";
+package org.danielzfranklin.rdbg.theme;
+
+service Theme {
+    rpc search (SearchRequest) returns (SearchReply);
+}
+
+message SearchRequest {
+    string query = 1;
+    enum SortBy {
+        RELEVANCE = 0;
+        RATING = 1;
+        DOWNLOADS = 2;
+        TIME = 4;
+    }
+    SortBy sort_by = 2;
+    enum SortOrder {
+        DESC = 0;
+        ASC = 1;
+    }
+    SortOrder sort_order = 3;
+    uint32 offset = 4;
+    uint32 page_size = 5;
+}
+
+message SearchReply {
+    repeated ThemeMeta themes = 1;
+    uint32 offset = 2;
+    uint32 total_size = 3;
+}
+
+message ThemeMeta {
+    string download_url = 1;
+    optional string icon_url = 2;
+    string name = 3;
+    string namespace = 4;
+    string version = 5;
+    optional float rating = 6;
+    uint32 downloads = 7;
+    string display_name = 8;
+    string description = 9;
+}

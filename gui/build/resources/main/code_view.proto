@@ -1,0 +1,123 @@
+syntax = "proto3";
+package org.danielzfranklin.rdbg;
+
+service CodeView {
+    // Separated so we can display source while waiting for highlights
+    rpc source(SourceRequest) returns (SourceReply);
+    rpc highlight(HighlightRequest) returns (HighlightReply);
+}
+
+message FileId {
+    uint32 id = 1;
+}
+
+message SourceRequest {
+    FileId file = 1;
+}
+
+message SourceReply {
+    string source = 1;
+}
+
+message HighlightRequest {
+    FileId file = 1;
+}
+
+message HighlightReply {
+    repeated HlRange ranges = 1;
+}
+
+message HlRange {
+    TextRange range = 1;
+    Highlight highlight = 2;
+}
+
+message TextRange {
+    uint32 start = 1;
+    uint32 end = 2;
+}
+
+message Highlight {
+    oneof tag {
+        bool is_none = 1;
+        SymbolKind symbol = 2;
+        bool is_attribute = 3;
+        bool is_bool_literal = 4;
+        bool is_builtin_type = 5;
+        bool is_byte_literal = 6;
+        bool is_char_literal = 7;
+        bool is_comment = 8;
+        bool is_escape_sequence = 9;
+        bool is_format_specifier = 10;
+        bool is_keyword = 11;
+        bool is_numeric_literal = 12;
+        HlOperator operator = 13;
+        HlPunct punct = 14;
+        bool is_string_literal = 15;
+        bool is_unresolved_reference = 16;
+    }
+    repeated HlMod mods = 50;
+}
+
+enum SymbolKind {
+    SYMBOL_UNKNOWN = 0;
+    SYMBOL_CONST = 1;
+    SYMBOL_CONST_PARAM = 2;
+    SYMBOL_ENUM = 3;
+    SYMBOL_FIELD = 4;
+    SYMBOL_FUNCTION = 5;
+    SYMBOL_IMPL = 6;
+    SYMBOL_LABEL = 7;
+    SYMBOL_LIFETIME_PARAM = 8;
+    SYMBOL_LOCAL = 9;
+    SYMBOL_MACRO = 10;
+    SYMBOL_MODULE = 11;
+    SYMBOL_SELF_PARAM = 12;
+    SYMBOL_STATIC = 13;
+    SYMBOL_STRUCT = 14;
+    SYMBOL_TRAIT = 15;
+    SYMBOL_TYPE_ALIAS = 16;
+    SYMBOL_TYPE_PARAM = 17;
+    SYMBOL_UNION = 18;
+    SYMBOL_VALUE_PARAM = 19;
+    SYMBOL_VARIENT = 20;
+}
+
+enum HlOperator {
+    OP_OTHER = 0;
+    OP_BITWISE = 1;
+    OP_ARITHMETIC = 2;
+    OP_LOGICAL = 3;
+    OP_COMPARISON = 4;
+}
+
+enum HlPunct {
+    PUNCT_OTHER = 0;
+    PUNCT_BRACKET = 1;
+    PUNCT_BRACE = 2;
+    PUNCT_PARENTHESIS = 3;
+    PUNCT_ANGLE = 4;
+    PUNCT_COMMA = 5;
+    PUNCT_DOT = 6;
+    PUNCT_COLON = 7;
+    PUNCT_SEMI = 8;
+}
+
+enum HlMod {
+    MOD_UNKNOWN = 0;
+    MOD_ASSOCIATED = 1;
+    MOD_ATTRIBUTE = 2;
+    MOD_CALLABLE = 3;
+    MOD_CONSUMING = 4;
+    MOD_CONTROL_FLOW = 5;
+    MOD_DEFINITION = 6;
+    MOD_DOCUMENTATION = 7;
+    MOD_INJECTED = 8;
+    MOD_INTRA_DOC_LINK = 9;
+    MOD_MUTABLE = 10;
+    MOD_STATIC = 11;
+    MOD_TRAIT = 12;
+    MOD_ASYNC = 13;
+    MOD_LIBRARY = 14;
+    MOD_UNSAFE = 15;
+}

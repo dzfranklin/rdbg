@@ -1,0 +1,49 @@
+syntax = "proto3";
+package org.danielzfranklin.rdbg;
+
+service Replayer {
+    /// Only one CreateReply will be returned. Your session token is only valid
+    /// for as long as you keep listening to the stream.
+    rpc create(CreateRequest) returns (stream CreateReply);
+
+    rpc index(IndexRequest) returns (IndexReply);
+}
+
+message CreateRequest {
+    string trace_dir = 1;
+    string crate_name = 2;
+}
+
+message CreateReply {
+    uint32 token = 1;
+}
+
+message IndexRequest {
+    uint32 token = 1;
+}
+
+message IndexReply {
+    repeated IndexFrame frames = 1;
+}
+
+message IndexFrame {
+    Frame frame = 1;
+    repeated Variable vars = 2;
+    repeated Frame parents = 3;
+    uint32 checkpoint = 4;
+}
+
+message Frame {
+    uint32 level = 1;
+    uint64 address = 2;
+    string function = 3; // Commonly missing
+    string file = 4; // Commonly missing
+    uint32 line = 5; // Commonly missing
+}
+
+message Variable {
+    string name = 1;
+    string var_type = 2;
+    string value = 3; // Present if var_type is simple
+    bool is_arg = 4;
+}

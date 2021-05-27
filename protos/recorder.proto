@@ -1,0 +1,24 @@
+syntax = "proto3";
+package org.danielzfranklin.rdbg.recorder;
+
+service Recorder {
+    // TODO: rpc record_bin
+    // TODO: rpc record_example
+    rpc record_test(RecordTestRequest) returns (RecordTestReply);
+}
+
+message RecordTestRequest {
+    string workspace = 1;
+    string package = 2;
+    string test_fn_path = 3;
+    oneof test_type {
+        bool is_lib = 4;
+        string bin_name = 5;
+        string integration_name = 6;
+        bool is_doc = 7;
+    }
+}
+
+message RecordTestReply {
+    string trace_dir = 1;
+}
